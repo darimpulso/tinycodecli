@@ -44,8 +44,7 @@ io.sockets.on('connection', function (socket) {
 
 
 rl = readline.createInterface(process.stdin, process.stdout);
-rl.setPrompt('VIVID WEBCLI > ');
-rl.prompt({preserveCursor:false});
+
 
 
 
@@ -65,8 +64,13 @@ _.each(projects, function(project, i){
     projectTable.push([i, project, null])
 })
 
+var activeProject = 'local';
+
+rl.setPrompt('VIVID WEBCLI local > ');
+rl.prompt({preserveCursor:false});
 
 function gitHub(argv, callback) {
+    if(!argv) return callback(['No input file specified'], null);
     var grep;
     switch(argv) {
         case "s":
@@ -96,6 +100,8 @@ function gitHub(argv, callback) {
 }
 
 function finder(keyword, callback){
+    if(!keyword) return callback(['No input file specified'], null);
+
     var table = new Table({
         head: ['Filename', 'Line / Code'],
         colWidths: [60,100]
@@ -132,6 +138,8 @@ function finder(keyword, callback){
 }
 
 function lister(keyword, callback) {
+    if(!keyword) return callback(['No input file specified'], null);
+
     var foundItems = [];
 
     var table = new Table({
@@ -306,7 +314,34 @@ rl.on('line', function(line) {
             argv.d = projectRoot+'/'+kw[1];
             directory = projectRoot+'/'+kw[1];
 
+            var isValidProject = _.find(projects, function(project){
+                return project === kw[1];
+            })
+
+            if(!isValidProject) {
+                console.log("\n");
+                console.log('Project not found'.red);
+
+                var regex = new RegExp(kw[1]);
+
+                var suggestions = _.filter(projects, function(project){
+                    return regex.test(project);
+                })
+                console.log("\n");
+                console.log('Maybe you did look for:' .underline);
+                _.each(suggestions, function(suggestion){
+                    console.log(suggestion .magenta);
+                })
+
+                console.log("\n");
+                return rl.prompt();
+            }
+
+            activeProject = kw[1];
+            rl.setPrompt('VIVID WEBCLI '+activeProject+' > ');
+
             console.log("\n");
+            console.log('Project changed to: '+_.capitalize(kw[1]) .green);
             console.log('Directory changed to '+argv.d .magenta);
             console.log("\n");
             return rl.prompt();
@@ -345,6 +380,30 @@ rl.on('line', function(line) {
         case "s":
             io.sockets.emit('com', {command: kw[1], message: _.rest(kw, 2)});
             rl.prompt();
+        break;
+        case "lp":
+            var activeProjects = _.filter(projects, function(project){ return !_(project).startsWith('.');})
+            var projectTable = new Table({
+                head: ['Index', 'Project Name'],
+                colWidths: [30,80]
+            })
+            var done = _.map(activeProjects, function(project, i){
+                return projectTable.push([i+1, project])
+            })
+            console.log("\n");
+            if(done) {
+                console.log(projectTable.toString());
+            }
+            console.log("\n");
+            rl.prompt();
+        break;
+        case "sh":
+            fs.readFile(directory+'/'+kw[1], "UTF8", function(err, data){
+                console.log('OUTPUT FILE: '+directory+'/'+kw[1]);
+                console.log(data);
+                console.log('\n');
+                rl.prompt();
+            });
         break;
         default:
             return rl.prompt();
