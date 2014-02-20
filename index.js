@@ -6,7 +6,6 @@ var _ = require("underscore")
     , argv = require('optimist').argv
     , colors = require('colors')
     , spawn = require('child_process').spawn
-    , directory = argv.d ? argv.d : __dirname
     , Table = require('cli-table')
     , readline = require('readline')
     , util = require("util")
@@ -46,9 +45,6 @@ io.sockets.on('connection', function (socket) {
 rl = readline.createInterface(process.stdin, process.stdout);
 
 
-
-
-
 var projectRoot = '/Volumes/www';
 
 var projectPaths = fs.readdirSync(projectRoot);
@@ -64,17 +60,24 @@ _.each(projects, function(project, i){
     projectTable.push([i, project, null])
 })
 
-var activeProject = 'local';
+var directory = argv.d ? argv.d : (argv.p ? projectRoot+'/'+argv.p : __dirname);
 
-rl.setPrompt('VIVID WEBCLI local > ');
+var activeProject = argv.p ? argv.p : 'local';
+
+rl.setPrompt('VIVID WEBCLI '+activeProject+' > ');
 rl.prompt({preserveCursor:false});
 
 function gitHub(argv, callback) {
-    if(!argv) return callback(['No input file specified'], null);
+    if(!argv[1]) return callback(['No input file specified'], null);
     var grep;
-    switch(argv) {
+    var args = _.rest(argv, 2);
+    console.log('Query GIT \n' .yellow);
+    switch(argv[1]) {
         case "s":
         grep = spawn('git', ['--git-dir='+directory+'/.git', '--work-tree='+directory,'status']);
+        case "log":
+        grep = spawn('git', ['--git-dir='+directory+'/.git', '--work-tree='+directory,'log', (args.length) ? args.toString() : '--all']);
+        break;
         break;
     }
     grep.stdout.on('data', function(data){
@@ -103,19 +106,21 @@ function finder(keyword, callback){
     if(!keyword) return callback(['No input file specified'], null);
 
     var table = new Table({
-        head: ['Filename', 'Line / Code'],
-        colWidths: [60,100]
+        head: ['Filename', 'Code', 'Line'],
+        colWidths: [70,100,20]
     })
 
-    var grep = spawn('git', ['--git-dir='+directory+'/.git', '--work-tree='+directory,'grep', keyword]);
+    var grep = spawn('git', ['--git-dir='+directory+'/.git', '--work-tree='+directory,'grep','--line-number' , keyword]);
     util.puts("\nSearching for Code: "+keyword .cyan.bold+" IN "+directory .cyan.bold +"\n");
     grep.stdout.on('data', function(data){
         var array = data.toString().split('\n');
         _.map(array, function(obj){
             if(!_(obj).isEmpty()) {
-                var code = _(obj).strRight(':');
+                var codeAndLine = _(obj).strRight(':');
+                var code = _(codeAndLine).strRight(':');
+                var line = _(codeAndLine).strLeft(':');
                 var fileName = _(obj).strLeft(':');
-                return table.push([fileName, _.trim(code)]);
+                return table.push([fileName, _.trim(code), line]);
             }
         })
     })
@@ -365,7 +370,7 @@ rl.on('line', function(line) {
             })
         break;
         case "q":
-            gitHub(kw[1], function(err, response){
+            gitHub(kw, function(err, response){
                 if(err) {
                     console.log(err.toString() .red)
                 }
@@ -404,6 +409,20 @@ rl.on('line', function(line) {
                 console.log('\n');
                 rl.prompt();
             });
+        break;
+        case "help":
+            console.log('\n');
+            console.log('TinyCodeCLI Help :) ' .magenta);
+            console.log('\n');
+            console.log('g [keywords] -> git grep (searches active project code for keywords)');
+            console.log('f [keywords] -> find (searches active project tree for files)');
+            console.log('d [keywords] -> delete (shows files in table to select for deletion)');
+            console.log('cd [project] -> changes project directory');
+            console.log('lp -> lists active projects');
+            console.log('sh [relative path and filename] -> prints out source code');
+            console.log('s [command] -> socket emit (UNDER CONSTRUCTION)');
+            console.log('\n');
+            return rl.prompt();
         break;
         default:
             return rl.prompt();
