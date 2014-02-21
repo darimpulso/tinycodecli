@@ -1,4 +1,9 @@
-tinycodecli
-===========
 
-Tiny Code CLI
+*********
+    *   *   **   *   *   *
+    *   *   * *  *    * *
+    *   *   *  * *     *
+                      *
+                     *
+
+tinycodecli || Tiny Code CLI

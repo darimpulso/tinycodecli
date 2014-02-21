@@ -16,11 +16,15 @@ var _ = require("underscore")
 
 _.mixin(_s.exports());
 
+var readMe = fs.readFileSync('./README.md', 'utf8');
+console.log(readMe);
+
 var io = require('socket.io').listen(3800);
+console.log("\n");
 
 io.configure(function(){
   io.enable('browser client etag');
-  io.set('log level', 1);
+  io.set('log level', 0);
 
   io.set('transports', [
     'websocket'
@@ -370,7 +374,7 @@ rl.on('line', function(line) {
                 rl.prompt();
             })
         break;
-        case "grep":
+        case "g":
             finder(kw[1], function(err, response){
                 if(err) {
                     console.log(err.toString() .red)
@@ -454,7 +458,7 @@ rl.on('line', function(line) {
             console.log('\n');
             console.log('TinyCodeCLI Help :) ' .magenta);
             console.log('\n');
-            console.log('grep [keywords] -> git grep (searches active project code for keywords)');
+            console.log('g [keywords] -> git grep (searches active project code for keywords)');
             console.log('find [keywords] -> find (searches active project tree for files)');
             console.log('del [keywords] -> delete (shows files in table to select for deletion)');
             console.log('cd [project] -> changes project directory');
