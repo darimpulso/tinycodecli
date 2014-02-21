@@ -9,6 +9,9 @@ var _ = require("underscore")
     , Table = require('cli-table')
     , readline = require('readline')
     , util = require("util")
+    , request = require("request")
+    , $ = require("jquery")
+    , Browser = require('zombie')
     , sigcount = 0
 
 _.mixin(_s.exports());
@@ -46,10 +49,11 @@ rl = readline.createInterface(process.stdin, process.stdout);
 
 
 var projectRoot = '/Volumes/www';
+var vps = 'daniel.vivid';
 
 var projectPaths = fs.readdirSync(projectRoot);
 var projects = _.filter(projectPaths, function(path){
-    if(!path.match('^._')) return path;
+    if(!_(path).startsWith('.')) return path;
 })
 
 var projectTable = new Table({
@@ -57,7 +61,7 @@ var projectTable = new Table({
     colWidths: [20,50,10]
 })
 _.each(projects, function(project, i){
-    projectTable.push([i, project, null])
+    projectTable.push([i, project, 'null'])
 })
 
 var directory = argv.d ? argv.d : (argv.p ? projectRoot+'/'+argv.p : __dirname);
@@ -78,7 +82,9 @@ function gitHub(argv, callback) {
         case "log":
         grep = spawn('git', ['--git-dir='+directory+'/.git', '--work-tree='+directory,'log', (args.length) ? args.toString() : '--all']);
         break;
-        break;
+        default:
+            console.log('Unknown command');
+            return rl.prompt();
     }
     grep.stdout.on('data', function(data){
         console.log(data.toString());
@@ -303,10 +309,14 @@ rl.on('line', function(line) {
     var kw = _.words(line);
 
     switch(kw[0]) {
-        case "e":
+        case "exit":
             process.exit(0);
         break;
-        case "d":
+        case "ld":
+            console.log(directory .magenta);
+            return rl.prompt();
+        break;
+        case "del":
             remover(kw[1], function(err, response){
                 if(err) {
                     console.log(err.toString() .red)
@@ -351,7 +361,7 @@ rl.on('line', function(line) {
             console.log("\n");
             return rl.prompt();
         break;
-        case "f":
+        case "find":
             lister(kw[1], function(err, response){
                 if(err) {
                     console.log(err.toString() .red)
@@ -360,7 +370,7 @@ rl.on('line', function(line) {
                 rl.prompt();
             })
         break;
-        case "g":
+        case "grep":
             finder(kw[1], function(err, response){
                 if(err) {
                     console.log(err.toString() .red)
@@ -369,7 +379,7 @@ rl.on('line', function(line) {
                 rl.prompt();
             })
         break;
-        case "q":
+        case "git":
             gitHub(kw, function(err, response){
                 if(err) {
                     console.log(err.toString() .red)
@@ -379,25 +389,42 @@ rl.on('line', function(line) {
             })
         break;
         case "cp":
-        return rl.prompt();
             console.log(projectTable.toString());
+            console.log('\n');
+            rl.question('Please select a project by its index > ', function(answer){
+                if(_(answer).isBlank()) return rl.prompt();
+
+                if(_.isNaN(_(answer).toNumber())) {
+                    console.log('Not a Number, aborting .. ' .red);
+                    return rl.prompt();
+                }
+
+                var index = _(answer).toNumber();
+                activeProject = projects[index];
+                argv.d = projectRoot+'/'+activeProject;
+                directory = projectRoot+'/'+activeProject;
+                rl.setPrompt('VIVID WEBCLI '+activeProject+' > ');
+
+                return rl.prompt();
+            })
+
         break;
-        case "s":
+        case "send":
             io.sockets.emit('com', {command: kw[1], message: _.rest(kw, 2)});
             rl.prompt();
         break;
         case "lp":
             var activeProjects = _.filter(projects, function(project){ return !_(project).startsWith('.');})
-            var projectTable = new Table({
+            var pt = new Table({
                 head: ['Index', 'Project Name'],
                 colWidths: [30,80]
             })
             var done = _.map(activeProjects, function(project, i){
-                return projectTable.push([i+1, project])
+                return pt.push([i+1, project])
             })
             console.log("\n");
             if(done) {
-                console.log(projectTable.toString());
+                console.log(pt.toString());
             }
             console.log("\n");
             rl.prompt();
@@ -410,19 +437,37 @@ rl.on('line', function(line) {
                 rl.prompt();
             });
         break;
+        case "dom":
+            var toServer = kw[1] ? kw[1] : 'http://'+activeProject+'.'+vps;
+            if(!_(toServer).startsWith('http')){
+                toServer = 'http://'+toServer;
+            }
+            console.log('Query: '+toServer);
+            request(toServer, function(err, response, body){
+                var string = body.toString();
+                console.log(string.length);
+                console.log('\n\n')
+                return rl.prompt();
+            })
+        break;
         case "help":
             console.log('\n');
             console.log('TinyCodeCLI Help :) ' .magenta);
             console.log('\n');
-            console.log('g [keywords] -> git grep (searches active project code for keywords)');
-            console.log('f [keywords] -> find (searches active project tree for files)');
-            console.log('d [keywords] -> delete (shows files in table to select for deletion)');
+            console.log('grep [keywords] -> git grep (searches active project code for keywords)');
+            console.log('find [keywords] -> find (searches active project tree for files)');
+            console.log('del [keywords] -> delete (shows files in table to select for deletion)');
             console.log('cd [project] -> changes project directory');
             console.log('lp -> lists active projects');
+            console.log('ld -> console log active directory');
             console.log('sh [relative path and filename] -> prints out source code');
+            console.log('git [command] [args] -> git on current folder');
             console.log('s [command] -> socket emit (UNDER CONSTRUCTION)');
             console.log('\n');
             return rl.prompt();
+        break;
+        case "sb":
+
         break;
         default:
             return rl.prompt();
