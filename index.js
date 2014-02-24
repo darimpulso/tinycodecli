@@ -434,6 +434,10 @@ rl.on('line', function(line) {
             rl.prompt();
         break;
         case "sh":
+            if(!kw[1]) {
+                console.log('Please specify a file (absolute url)!' .red);
+                return rl.prompt();
+            }
             fs.readFile(directory+'/'+kw[1], "UTF8", function(err, data){
                 console.log('OUTPUT FILE: '+directory+'/'+kw[1]);
                 console.log(data);
@@ -469,9 +473,6 @@ rl.on('line', function(line) {
             console.log('s [command] -> socket emit (UNDER CONSTRUCTION)');
             console.log('\n');
             return rl.prompt();
-        break;
-        case "sb":
-
         break;
         default:
             return rl.prompt();
