@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 var _ = require("underscore")
+    , express = require('express')
+    , app = express()
+    , server = require('http').createServer(app)
     , fs = require('fs')
     , _s = require("underscore.string")
     , argv = require('optimist').argv
@@ -19,7 +22,9 @@ _.mixin(_s.exports());
 var readMe = fs.readFileSync('./README.md', 'utf8');
 console.log(readMe);
 
-var io = require('socket.io').listen(3800);
+server.listen(3800)
+
+var io = require('socket.io').listen(server);
 console.log("\n");
 
 io.configure(function(){
@@ -39,7 +44,10 @@ io.sockets.on('connection', function (socket) {
   io.sockets.emit('this', { will: 'be received by everyone'});
 
   socket.on('message', function (from, msg) {
-    console.log('I received a private message by ', from, ' saying ', msg);
+    console.log('\n')
+    console.log('I received a private message by ', from .magenta, ' saying ', msg .blue);
+    console.log('\n');
+    rl.prompt();
   });
 
   socket.on('disconnect', function () {
@@ -470,9 +478,59 @@ rl.on('line', function(line) {
             console.log('ld -> console log active directory');
             console.log('sh [relative path and filename] -> prints out source code');
             console.log('git [command] [args] -> git on current folder');
-            console.log('s [command] -> socket emit (UNDER CONSTRUCTION)');
+            console.log('send [command] -> socket emit (Beta)');
+            console.log('vps [cc|ccw|mem] -> executes vps commands on active project');
+            console.log('ssh [kill-watches|ls] -> executes commands via ssh');
             console.log('\n');
             return rl.prompt();
+        break;
+        case "vps":
+           var cmd = null;
+           switch(kw[1]) {
+                case "cc":
+                    cmd = 'clear-cache';
+                break;
+                case "ccw":
+                    cmd = 'clear-cache-watcher';
+                break;
+                case "mem":
+                    cmd = 'clear-cache memcache';
+                break;
+           }
+           var ssh = spawn('ssh', ['daniel.vivid', 'cd www/'+activeProject+';', 'vps '+cmd]);
+           ssh.stdout.on('data', function(data){
+                console.log(data.toString());
+           })
+           ssh.stderr.on('data', function(err){
+                console.error(err.toString())
+                return rl.prompt();
+           })
+           ssh.on('close', function(){
+                console.log('Child process closed \n');
+                return rl.prompt();
+           })
+        break;
+        case "ssh":
+           var cmd = null;
+           switch(kw[1]) {
+                case "kill-watches":
+                    cmd = 'killall inotifywait';
+                break;
+                case "ls":
+                    cmd = 'ls -lah';
+                break;
+           }
+           var ssh = spawn('ssh', ['daniel.vivid', 'cd www/'+activeProject+';', cmd]);
+           ssh.stdout.on('data', function(data){
+                console.log(data.toString());
+           })
+           ssh.stderr.on('data', function(err){
+                console.error(err.toString())
+           })
+           ssh.on('close', function(){
+                console.log('Child process closed \n');
+                return rl.prompt();
+           })
         break;
         default:
             return rl.prompt();
@@ -491,4 +549,24 @@ rl.on('line', function(line) {
 }).on("SIGCONT", function(){
     console.log("got sig");
     rl.prompt();
+})
+
+app.get('/*', function(req, res){
+    var cmd = _.first(req.params);
+    console.log('\n');
+    console.log('Received command  '+cmd .magenta+'  >  query: '+_.values(req.query).join(',') .cyan);
+    switch(cmd) {
+        case "watcher":
+            if(req.query.cacheType === 'css') {
+                io.sockets.emit('com', {command: 'stylesheet'});
+            } else if(req.query.cacheType === 'js') {
+                io.sockets.emit('com', {command: 'jscript'});
+            } else {
+                io.sockets.emit('com', {command: 'reload'});
+            }
+        break;
+    }
+    console.log('\n');
+    rl.prompt();
+    res.send(200);
 })
